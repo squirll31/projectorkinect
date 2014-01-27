@@ -99,12 +99,23 @@ void DispatchDraws() {
 	pthread_mutex_unlock(&video_mutex);
 }
 void DrawString(char * theString){
-	glRasterPos3f(50, 50, 0);
+	int x = 50;
+	//glColor3f(1.0, 1.0, 1.0); // Green
+
+	glRasterPos3f(50, x, 0);
+	
 	void * font = GLUT_BITMAP_HELVETICA_18;
 	int i = 0;
 	for (i = 0; i < strlen(theString); i++)
 	{
-		glutBitmapCharacter(font, theString[i]);
+		if (theString[i] != '\n')
+			glutBitmapCharacter(font, theString[i]);
+		else
+		{
+			x += 20;
+			glRasterPos3f(50, x, 0);
+			glutBitmapCharacter(font, theString[i]);
+		}
 	}
 }
 
@@ -136,7 +147,7 @@ void DrawDepthScene()
 	glTexCoord2f(0, 1); glVertex3f(0,480,0);
 	glEnd();
 
-	DrawString(debug_get_depth_string(frame_mode.depth_format));
+	DrawString(debug_get_frame_mode_string(frame_mode));
 	glutSwapBuffers();
 }
 
@@ -189,7 +200,7 @@ void DrawVideoScene()
 	glEnd();
 
 	
-	DrawString(debug_get_video_string(frame_mode.video_format));
+	DrawString(debug_get_frame_mode_string(frame_mode));
 	glutSwapBuffers();
 }
 
