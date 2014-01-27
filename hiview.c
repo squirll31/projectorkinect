@@ -136,7 +136,7 @@ void DrawDepthScene()
 	glTexCoord2f(0, 1); glVertex3f(0,480,0);
 	glEnd();
 
-	DrawString(debug_get_video_string(frame_mode.depth_format));
+	DrawString(debug_get_depth_string(frame_mode.depth_format));
 	glutSwapBuffers();
 }
 
@@ -189,7 +189,7 @@ void DrawVideoScene()
 	glEnd();
 
 	
-	DrawString(get_video_string(f_dev));
+	DrawString(debug_get_video_string(frame_mode.video_format));
 	glutSwapBuffers();
 }
 
