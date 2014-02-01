@@ -49,8 +49,6 @@
 
 #include <math.h>
 
-
-
 pthread_t freenect_thread;
 volatile int die = 0;
 
@@ -96,32 +94,10 @@ void DispatchDraws() {
 	pthread_mutex_lock(&video_mutex);
 	if (got_rgb) {
 		glutSetWindow(video_window);
-		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, 'H');
 		glutPostRedisplay();
 	}
 	pthread_mutex_unlock(&video_mutex);
 }
-void DrawString(char * theString){
-	int x = 50;
-	//glColor3f(1.0, 1.0, 1.0); // Green
-
-	glRasterPos3f(50, x, 0);
-	
-	void * font = GLUT_BITMAP_HELVETICA_18;
-	int i = 0;
-	for (i = 0; i < strlen(theString); i++)
-	{
-		if (theString[i] != '\n')
-			glutBitmapCharacter(font, theString[i]);
-		else
-		{
-			x += 20;
-			glRasterPos3f(50, x, 0);
-			glutBitmapCharacter(font, theString[i]);
-		}
-	}
-}
-
 
 void DrawDepthScene()
 {
@@ -133,7 +109,7 @@ void DrawDepthScene()
 		got_depth = 0;
 	}
 	pthread_mutex_unlock(&depth_mutex);
-	freenect_frame_mode frame_mode = freenect_get_current_depth_mode(f_dev);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
@@ -144,10 +120,10 @@ void DrawDepthScene()
 
 	glBegin(GL_TRIANGLE_FAN);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	glTexCoord2f(0, 0); glVertex3f(0,0,0);
-	glTexCoord2f(1, 0); glVertex3f(640,0,0);
-	glTexCoord2f(1, 1); glVertex3f(640,480,0);
-	glTexCoord2f(0, 1); glVertex3f(0,480,0);
+	glTexCoord2f(0, 0); glVertex3f(0, 0, 0);
+	glTexCoord2f(1, 0); glVertex3f(640, 0, 0);
+	glTexCoord2f(1, 1); glVertex3f(640, 480, 0);
+	glTexCoord2f(0, 1); glVertex3f(0, 480, 0);
 	glEnd();
 
 #if defined(DEBUG)
@@ -166,7 +142,6 @@ void DrawVideoScene()
 
 	freenect_frame_mode frame_mode = freenect_get_current_video_mode(f_dev);
 
-
 	if (got_rgb) {
 		uint8_t *tmp = rgb_front;
 		rgb_front = rgb_mid;
@@ -182,26 +157,18 @@ void DrawVideoScene()
 	glEnable(GL_TEXTURE_2D);
 
 	glBindTexture(GL_TEXTURE_2D, gl_rgb_tex);
-
-	char * x;
-	switch (current_format){
-	case FREENECT_VIDEO_RGB:
+	if (current_format == FREENECT_VIDEO_RGB || current_format == FREENECT_VIDEO_YUV_RGB) {
 		glTexImage2D(GL_TEXTURE_2D, 0, 3, frame_mode.width, frame_mode.height, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_front);
-		break;
-	case FREENECT_VIDEO_YUV_RGB:
-		glTexImage2D(GL_TEXTURE_2D, 0, 3, frame_mode.width, frame_mode.height, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_front);
-		break;
-	default:
-		glTexImage2D(GL_TEXTURE_2D, 0, 1, frame_mode.width, frame_mode.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, rgb_front);
-
 	}
-
+	else {
+		glTexImage2D(GL_TEXTURE_2D, 0, 1, frame_mode.width, frame_mode.height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, rgb_front);
+	}
 	glBegin(GL_TRIANGLE_FAN);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	glTexCoord2f(0, 0); glVertex3f(0,0,0);
-	glTexCoord2f(1, 0); glVertex3f(frame_mode.width,0,0);
-	glTexCoord2f(1, 1); glVertex3f(frame_mode.width,frame_mode.height,0);
-	glTexCoord2f(0, 1); glVertex3f(0,frame_mode.height,0);
+	glTexCoord2f(0, 0); glVertex3f(0, 0, 0);
+	glTexCoord2f(1, 0); glVertex3f(frame_mode.width, 0, 0);
+	glTexCoord2f(1, 1); glVertex3f(frame_mode.width, frame_mode.height, 0);
+	glTexCoord2f(0, 1); glVertex3f(0, frame_mode.height, 0);
 	glEnd();
 
 #if defined(DEBUG)
@@ -254,19 +221,23 @@ void keyPressed(unsigned char key, int x, int y)
 				// Since we can't stream the high-res IR while running the depth stream,
 				// we force the depth stream off when we reach this res in the cycle.
 				freenect_stop_depth(f_dev);
-				memset(depth_mid, 0, 640*480*3); // black out the depth camera
+				memset(depth_mid, 0, 640 * 480 * 3); // black out the depth camera
 				got_depth++;
 				depth_on = 0;
-			} else if (current_format == FREENECT_VIDEO_IR_8BIT) {
+			}
+			else if (current_format == FREENECT_VIDEO_IR_8BIT) {
 				requested_format = FREENECT_VIDEO_RGB;
 				requested_resolution = FREENECT_RESOLUTION_MEDIUM;
 			}
-		} else if (current_resolution == FREENECT_RESOLUTION_MEDIUM) {
-			if(current_format == FREENECT_VIDEO_RGB) {
+		}
+		else if (current_resolution == FREENECT_RESOLUTION_MEDIUM) {
+			if (current_format == FREENECT_VIDEO_RGB) {
 				requested_format = FREENECT_VIDEO_YUV_RGB;
-			} else if (current_format == FREENECT_VIDEO_YUV_RGB) {
+			}
+			else if (current_format == FREENECT_VIDEO_YUV_RGB) {
 				requested_format = FREENECT_VIDEO_IR_8BIT;
-			} else if (current_format == FREENECT_VIDEO_IR_8BIT) {
+			}
+			else if (current_format == FREENECT_VIDEO_IR_8BIT) {
 				requested_format = FREENECT_VIDEO_RGB;
 				requested_resolution = FREENECT_RESOLUTION_HIGH;
 			}
@@ -276,12 +247,13 @@ void keyPressed(unsigned char key, int x, int y)
 		glutReshapeWindow(s.width, s.height);
 	}
 	if (key == 'd') { // Toggle depth camera.
-		if(depth_on) {
+		if (depth_on) {
 			freenect_stop_depth(f_dev);
-			memset(depth_mid, 0, 640*480*3); // black out the depth camera
+			memset(depth_mid, 0, 640 * 480 * 3); // black out the depth camera
 			got_depth++;
 			depth_on = 0;
-		} else {
+		}
+		else {
 			freenect_start_depth(f_dev);
 			depth_on = 1;
 		}
@@ -290,10 +262,10 @@ void keyPressed(unsigned char key, int x, int y)
 
 void ReSizeGLScene(int Width, int Height)
 {
-	glViewport(0,0,Width,Height);
+	glViewport(0, 0, Width, Height);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	glOrtho (0, Width, Height, 0, -1.0f, 1.0f);
+	glOrtho(0, Width, Height, 0, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW);
 }
 
@@ -304,7 +276,7 @@ void InitGL(int Width, int Height)
 	glDepthFunc(GL_LESS);
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
-	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glShadeModel(GL_SMOOTH);
 	glGenTextures(1, &gl_depth_tex);
 	glBindTexture(GL_TEXTURE_2D, gl_depth_tex);
@@ -346,8 +318,8 @@ void *gl_threadfunc(void *arg)
 	// get current resolution, format
 	freenect_frame_mode mode = freenect_find_video_mode(current_resolution, current_format);
 
-	// create the video window
-	glutInitWindowPosition(640,0);
+	// create the window
+	glutInitWindowPosition(640, 0);
 	glutInitWindowSize(mode.width, mode.height);
 	video_window = glutCreateWindow("Video");
 
@@ -357,7 +329,7 @@ void *gl_threadfunc(void *arg)
 	// register dispatch callback
 	glutIdleFunc(&DispatchDraws);
 
-	// register onResize function
+	// register on resize function
 	glutReshapeFunc(&ReSizeGLScene);
 
 	// register key event listener
@@ -385,44 +357,68 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 	pthread_mutex_lock(&depth_mutex);
 
 	// convert depth to color?
-	for (i=0; i<640*480; i++) {
+
+	//  go through each pixel per frame.
+	//    there are 307,200 pixels.
+	for (i = 0; i<640 * 480; i++) {
+
+		//  depth: has 307,200 elements.
+		//    each with a value ranging from between 0 to 2047
+		//      otherwise we would be indexing out of t_gamma's range: Segmentation Fault.
+		//      However, we do notice from the definition, each depth element has 16 bits available to it.
+		//        we're practically dropping 5 bits from the high end of the potential 16 bits, to have 11 bits populated.
+
+		//  then we use the resulting 11 bit unsigned integer to index into t_gamma, 
+		//    and get an unsigned 16 bit integer, and cast it to a regular integer.
 		int pval = t_gamma[depth[i]];
+
+		//  we take our previous unsigned 16 bit integer, cast to integer,
+		//    and take only the bottom 8 bits.
+		//      call it lb.
 		int lb = pval & 0xff;
-		switch (pval>>8) {
+
+		//  we take our previous unsigned 16 bit integer, cast to integer,
+		//    and shift its bits to the right 8?
+		//      which is the equivalent of dividing by 256?
+		//        and truncates, because switch only takes integers.
+		//          which leaves us only the high 8 bits of t_gamma[depth[i]]
+		switch (pval >> 8) {
 			case 0:
-				depth_mid[3*i+0] = 255;
-				depth_mid[3*i+1] = 255-lb;
-				depth_mid[3*i+2] = 255-lb;
+
+			//  
+			depth_mid[3 * i + 0] = 255;
+			depth_mid[3 * i + 1] = 255 - lb;
+			depth_mid[3 * i + 2] = 255 - lb;
 				break;
 			case 1:
-				depth_mid[3*i+0] = 255;
-				depth_mid[3*i+1] = lb;
-				depth_mid[3*i+2] = 0;
+			depth_mid[3 * i + 0] = 255;
+			depth_mid[3 * i + 1] = lb;
+			depth_mid[3 * i + 2] = 0;
 				break;
 			case 2:
-				depth_mid[3*i+0] = 255-lb;
-				depth_mid[3*i+1] = 255;
-				depth_mid[3*i+2] = 0;
+			depth_mid[3 * i + 0] = 255 - lb;
+			depth_mid[3 * i + 1] = 255;
+			depth_mid[3 * i + 2] = 0;
 				break;
 			case 3:
-				depth_mid[3*i+0] = 0;
-				depth_mid[3*i+1] = 255;
-				depth_mid[3*i+2] = lb;
+			depth_mid[3 * i + 0] = 0;
+			depth_mid[3 * i + 1] = 255;
+			depth_mid[3 * i + 2] = lb;
 				break;
 			case 4:
-				depth_mid[3*i+0] = 0;
-				depth_mid[3*i+1] = 255-lb;
-				depth_mid[3*i+2] = 255;
+			depth_mid[3 * i + 0] = 0;
+			depth_mid[3 * i + 1] = 255 - lb;
+			depth_mid[3 * i + 2] = 255;
 				break;
 			case 5:
-				depth_mid[3*i+0] = 0;
-				depth_mid[3*i+1] = 0;
-				depth_mid[3*i+2] = 255-lb;
+			depth_mid[3 * i + 0] = 0;
+			depth_mid[3 * i + 1] = 0;
+			depth_mid[3 * i + 2] = 255 - lb;
 				break;
 			default:
-				depth_mid[3*i+0] = 0;
-				depth_mid[3*i+1] = 0;
-				depth_mid[3*i+2] = 0;
+			depth_mid[3 * i + 0] = 0;
+			depth_mid[3 * i + 1] = 0;
+			depth_mid[3 * i + 2] = 0;
 				break;
 		}
 	}
@@ -435,7 +431,7 @@ void video_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 	pthread_mutex_lock(&video_mutex);
 
 	// swap buffers
-	assert (rgb_back == rgb);
+	assert(rgb_back == rgb);
 	rgb_back = rgb_mid;
 	freenect_set_video_buffer(dev, rgb_back);
 	rgb_mid = (uint8_t*)rgb;
@@ -447,7 +443,7 @@ void video_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 void *freenect_threadfunc(void *arg)
 {
 	// set led color
-	freenect_set_led(f_dev,LED_RED);
+	freenect_set_led(f_dev, LED_RED);
 
 	// register callback for depth frame
 	freenect_set_depth_callback(f_dev, depth_cb);
@@ -538,16 +534,26 @@ int main(int argc, char **argv)
 	int res;
 
 	// allocate 8-bit uint*s to hold depth data
-	depth_mid = (uint8_t*)malloc(640*480*3);
-	depth_front = (uint8_t*)malloc(640*480*3);
+	depth_mid = (uint8_t*)malloc(640 * 480 * 3);
+	depth_front = (uint8_t*)malloc(640 * 480 * 3);
 
 	printf("Kinect camera test\n");
 
 	int i;
-	for (i=0; i<2048; i++) {
-		float v = i/2048.0;
-		v = powf(v, 3)* 6;
-		t_gamma[i] = v*6*256;
+	for (i = 0; i<2048; i++) {
+		float v = i / 2048.0;
+		v = powf(v, 3) * 6;
+		t_gamma[i] = v * 6 * 256;
+		//  t_gamma[0] = 0
+		//  t_gamma[   1] = 6 * (6 * (1 / 2^33)) * 256
+		//  t_gamma[   1] = 9 / 2^23 = ??? small number. much below 1.
+		//  t_gamma[   2] = 6 * (6 * (1 / 2^30)) * 256
+		//  t_gamma[   3] = 6 * (6 * (9 / 2^33)) * 256
+		//  t_gamma[   4] = 6 * (6 * (1 / 2^9 )) * 256
+		//  t_gamma[2048] = 6 * (6 * (2048 / 2048)^3 * 256
+		//  t_gamma[2048] = 36 * 256
+		//  t_gamma[2048] = 9 * 2^10
+		//  t_gamma[2048] = ...about 9K?
 	}
 
 	g_argc = argc;
@@ -561,11 +567,12 @@ int main(int argc, char **argv)
 	// set up logging
 	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
 
+	// select which kinect parts to open
 	freenect_select_subdevices(f_ctx, (freenect_device_flags)(FREENECT_DEVICE_MOTOR | FREENECT_DEVICE_CAMERA));
 
 	// enumerate kinects attached
-	int nr_devices = freenect_num_devices (f_ctx);
-	printf ("Number of devices found: %d\n", nr_devices);
+	int nr_devices = freenect_num_devices(f_ctx);
+	printf("Number of devices found: %d\n", nr_devices);
 
 	// argv[1] is which device to use, default 0
 	int user_device_number = 0;
