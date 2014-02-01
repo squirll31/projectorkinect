@@ -30,7 +30,10 @@
 #include <string.h>
 #include <assert.h>
 #include "libfreenect.h"
+
+#if defined(DEBUG)
 #include "freenect_debug.h"
+#endif
 
 #include <pthread.h>
 
@@ -147,7 +150,9 @@ void DrawDepthScene()
 	glTexCoord2f(0, 1); glVertex3f(0,480,0);
 	glEnd();
 
+#if defined(DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
+#endif
 	glutSwapBuffers();
 }
 
@@ -199,8 +204,9 @@ void DrawVideoScene()
 	glTexCoord2f(0, 1); glVertex3f(0,frame_mode.height,0);
 	glEnd();
 
-	
+#if defined(DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
+#endif
 	glutSwapBuffers();
 }
 
@@ -554,9 +560,6 @@ int main(int argc, char **argv)
 
 	// set up logging
 	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
-
-	// select which kinect parts to open
-	printf("freenect_device_flags: %s\n", debug_print_device_flags(FREENECT_DEVICE_CAMERA));
 
 	freenect_select_subdevices(f_ctx, (freenect_device_flags)(FREENECT_DEVICE_MOTOR | FREENECT_DEVICE_CAMERA));
 
