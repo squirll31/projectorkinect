@@ -26,12 +26,19 @@
 
 
 #include <stdio.h>
+#if defined(_DEBUG)
+#define _CRTDBG_MAP_ALLOC
+#endif
 #include <stdlib.h>
+#if defined(_DEBUG)
+#include <crtdbg.h>
+#endif
+
 #include <string.h>
 #include <assert.h>
 #include "libfreenect.h"
 
-#if defined(DEBUG)
+#if defined(_DEBUG)
 #include "freenect_debug.h"
 #endif
 
@@ -110,6 +117,8 @@ void DrawDepthScene()
 	}
 	pthread_mutex_unlock(&depth_mutex);
 
+	freenect_frame_mode frame_mode = freenect_get_current_depth_mode(f_ctx);
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
@@ -126,7 +135,7 @@ void DrawDepthScene()
 	glTexCoord2f(0, 1); glVertex3f(0, 480, 0);
 	glEnd();
 
-#if defined(DEBUG)
+#if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
 	glutSwapBuffers();
@@ -171,7 +180,7 @@ void DrawVideoScene()
 	glTexCoord2f(0, 1); glVertex3f(0, frame_mode.height, 0);
 	glEnd();
 
-#if defined(DEBUG)
+#if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
 	glutSwapBuffers();
