@@ -48,6 +48,8 @@
 #include <math.h>
 #include <list>
 #include <string>
+#include <iostream>
+#include <iomanip>
 
 pthread_t freenect_thread;
 pthread_t test_thread;
@@ -85,6 +87,18 @@ int got_rgb = 0;
 int got_depth = 0;
 int depth_on = 1;
 
+freenect_video_format debug_video_formats[DEBUG_VIDEO_FORMATS_MAX] = { FREENECT_VIDEO_RGB, FREENECT_VIDEO_BAYER,
+FREENECT_VIDEO_IR_8BIT, FREENECT_VIDEO_IR_10BIT,
+FREENECT_VIDEO_IR_10BIT_PACKED, FREENECT_VIDEO_YUV_RGB,
+FREENECT_VIDEO_YUV_RAW };
+
+
+freenect_depth_format debug_depth_formats[DEBUG_DEPTH_FORMATS_MAX] = { FREENECT_DEPTH_11BIT,
+FREENECT_DEPTH_10BIT,
+FREENECT_DEPTH_11BIT_PACKED,
+FREENECT_DEPTH_10BIT_PACKED,
+FREENECT_DEPTH_REGISTERED,
+FREENECT_DEPTH_MM };
 
 
 void DispatchDraws() {
@@ -462,7 +476,21 @@ void video_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 
 void *test_threadfunc(void *arg)
 {
-	printf("Test init!\n");
+	int depth_ctr = 0,
+		video_ctr = 0,
+		test_count = 0;
+
+	std::cout << "Test thread init" << std::endl;
+	
+	for (depth_ctr = 0; depth_ctr < DEBUG_DEPTH_FORMATS_MAX; depth_ctr++)
+	{
+		for (video_ctr = 0; video_ctr < DEBUG_VIDEO_FORMATS_MAX; video_ctr++){
+			test_count++;
+			std::cout << "Test #" << test_count << std::endl
+			          << "\tDepth Mode: " << debug_get_depth_string(debug_depth_formats[depth_ctr])->c_str() << std::endl
+				      << "\tVideo Mode: " << debug_get_video_string(debug_video_formats[video_ctr])->c_str() << std::endl;
+		}
+	}
 
 	printf("Done");
 	return NULL;
@@ -623,6 +651,11 @@ int main(int argc, char **argv)
 	// if no device is attached, quit
 	if (nr_devices < 1) {
 		freenect_shutdown(f_ctx);
+		free(depth_mid);
+		free(depth_front);
+		free(rgb_back);
+		free(rgb_mid);
+		free(rgb_front);
 		return 1;
 	}
 
@@ -631,14 +664,24 @@ int main(int argc, char **argv)
 	if (freenect_open_device(f_ctx, &f_dev, user_device_number) < 0) {
 		printf("Could not open device\n");
 		freenect_shutdown(f_ctx);
+		free(depth_mid);
+		free(depth_front);
+		free(rgb_back);
+		free(rgb_mid);
+		free(rgb_front);
 		return 1;
 	}
 
-	// start the freenect thread
+	//// start the freenect thread
 	res = pthread_create(&freenect_thread, NULL, freenect_threadfunc, NULL);
 	if (res) {
 		printf("pthread_create failed\n");
 		freenect_shutdown(f_ctx);
+		free(depth_mid);
+		free(depth_front);
+		free(rgb_back);
+		free(rgb_mid);
+		free(rgb_front);
 		return 1;
 	}
 
@@ -647,6 +690,11 @@ int main(int argc, char **argv)
 	if (res) {
 		printf("pthread_create failed\n");
 		freenect_shutdown(f_ctx);
+		free(depth_mid);
+		free(depth_front);
+		free(rgb_back);
+		free(rgb_mid);
+		free(rgb_front);
 		return 1;
 	}
 
@@ -667,5 +715,6 @@ int main(int argc, char **argv)
 
 
 	_CrtDumpMemoryLeaks();
+	system("PAUSE");
 	return 0;
 }
