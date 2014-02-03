@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hiview.c">
+    <ClCompile Include="freenect_debug.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="freenect_debug.cpp">
+    <ClCompile Include="hiview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

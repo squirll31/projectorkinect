@@ -80,7 +80,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="freenect_debug.cpp" />
-    <ClCompile Include="hiview.c" />
+    <ClCompile Include="hiview.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="freenect_debug.h" />

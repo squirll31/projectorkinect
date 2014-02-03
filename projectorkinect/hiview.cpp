@@ -1,48 +1,39 @@
 /*
- * This file is part of the OpenKinect Project. http://www.openkinect.org
- *
- * Copyright (c) 2010 individual OpenKinect contributors. See the CONTRIB file
- * for details.
- *
- * This code is licensed to you under the terms of the Apache License, version
- * 2.0, or, at your option, the terms of the GNU General Public License,
- * version 2.0. See the APACHE20 and GPL2 files for the text of the licenses,
- * or the following URLs:
- * http://www.apache.org/licenses/LICENSE-2.0
- * http://www.gnu.org/licenses/gpl-2.0.txt
- *
- * If you redistribute this file in source form, modified or unmodified, you
- * may:
- *   1) Leave this header intact and distribute it under the same terms,
- *      accompanying it with the APACHE20 and GPL20 files, or
- *   2) Delete the Apache 2.0 clause and accompany it with the GPL2 file, or
- *   3) Delete the GPL v2 clause and accompany it with the APACHE20 file
- * In all cases you must keep the copyright notice intact and include a copy
- * of the CONTRIB file.
- *
- * Binary distributions must follow the binary distribution requirements of
- * either License.
- */
+* This file is part of the OpenKinect Project. http://www.openkinect.org
+*
+* Copyright (c) 2010 individual OpenKinect contributors. See the CONTRIB file
+* for details.
+*
+* This code is licensed to you under the terms of the Apache License, version
+* 2.0, or, at your option, the terms of the GNU General Public License,
+* version 2.0. See the APACHE20 and GPL2 files for the text of the licenses,
+* or the following URLs:
+* http://www.apache.org/licenses/LICENSE-2.0
+* http://www.gnu.org/licenses/gpl-2.0.txt
+*
+* If you redistribute this file in source form, modified or unmodified, you
+* may:
+*   1) Leave this header intact and distribute it under the same terms,
+*      accompanying it with the APACHE20 and GPL20 files, or
+*   2) Delete the Apache 2.0 clause and accompany it with the GPL2 file, or
+*   3) Delete the GPL v2 clause and accompany it with the APACHE20 file
+* In all cases you must keep the copyright notice intact and include a copy
+* of the CONTRIB file.
+*
+* Binary distributions must follow the binary distribution requirements of
+* either License.
+*/
+#define _CRTDBG_MAP_ALLOC
 
 
 #include <stdio.h>
-#if defined(_DEBUG)
-#define _CRTDBG_MAP_ALLOC
-#endif
 #include <stdlib.h>
-#if defined(_DEBUG)
 #include <crtdbg.h>
-#endif
-
 #include <string.h>
 #include <assert.h>
-#include "libfreenect.h"
-
-#if defined(_DEBUG)
-#include "freenect_debug.h"
-#endif
-
 #include <pthread.h>
+#include <libfreenect.h>
+#include "freenect_debug.h"
 
 #if defined(__APPLE__)
 #include <GLUT/glut.h>
@@ -55,6 +46,8 @@
 #endif
 
 #include <math.h>
+#include <list>
+#include <string>
 
 pthread_t freenect_thread;
 volatile int die = 0;
@@ -91,6 +84,8 @@ int got_rgb = 0;
 int got_depth = 0;
 int depth_on = 1;
 
+
+
 void DispatchDraws() {
 	pthread_mutex_lock(&depth_mutex);
 	if (got_depth) {
@@ -105,6 +100,27 @@ void DispatchDraws() {
 	}
 	pthread_mutex_unlock(&video_mutex);
 }
+void DrawString(std::string * theString){
+	int x = 50;
+	//glColor3f(1.0, 1.0, 1.0); // Green
+
+	glRasterPos3f(50, x, 0);
+
+	void * font = GLUT_BITMAP_HELVETICA_18;
+	unsigned int i = 0;
+	for (i = 0; i < theString->length(); i++)
+	{
+		if (theString->at(i) != '\n')
+			glutBitmapCharacter(font, theString->at(i));
+		else
+		{
+			x += 20;
+			glRasterPos3f(50, x, 0);
+			glutBitmapCharacter(font, theString->at(i));
+		}
+	}
+	delete theString;
+}
 
 void DrawDepthScene()
 {
@@ -117,7 +133,7 @@ void DrawDepthScene()
 	}
 	pthread_mutex_unlock(&depth_mutex);
 
-	freenect_frame_mode frame_mode = freenect_get_current_depth_mode(f_ctx);
+	freenect_frame_mode frame_mode = freenect_get_current_depth_mode(f_dev);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
@@ -138,6 +154,7 @@ void DrawDepthScene()
 #if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
+
 	glutSwapBuffers();
 }
 
@@ -183,6 +200,7 @@ void DrawVideoScene()
 #if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
+
 	glutSwapBuffers();
 }
 
@@ -193,11 +211,7 @@ void keyPressed(unsigned char key, int x, int y)
 		pthread_join(freenect_thread, NULL);
 		glutDestroyWindow(depth_window);
 		glutDestroyWindow(video_window);
-		free(depth_mid);
-		free(depth_front);
-		free(rgb_back);
-		free(rgb_mid);
-		free(rgb_front);
+
 		// Not pthread_exit because OSX leaves a thread lying around and doesn't exit
 		exit(0);
 	}
@@ -224,8 +238,8 @@ void keyPressed(unsigned char key, int x, int y)
 			break;
 		}
 
-		if(current_resolution == FREENECT_RESOLUTION_HIGH) {
-			if(current_format == FREENECT_VIDEO_RGB) {
+		if (current_resolution == FREENECT_RESOLUTION_HIGH) {
+			if (current_format == FREENECT_VIDEO_RGB) {
 				requested_format = FREENECT_VIDEO_IR_8BIT;
 				// Since we can't stream the high-res IR while running the depth stream,
 				// we force the depth stream off when we reach this res in the cycle.
@@ -311,10 +325,10 @@ void *gl_threadfunc(void *arg)
 	glutInitWindowSize(640, 480);
 	glutInitWindowPosition(0, 0);
 	depth_window = glutCreateWindow("Depth");
-	
+
 	// register depth callback
 	glutDisplayFunc(&DrawDepthScene);
-	
+
 	// register frame dispatch callback
 	glutIdleFunc(&DispatchDraws);
 
@@ -392,43 +406,43 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 		//        and truncates, because switch only takes integers.
 		//          which leaves us only the high 8 bits of t_gamma[depth[i]]
 		switch (pval >> 8) {
-			case 0:
+		case 0:
 
 			//  
 			depth_mid[3 * i + 0] = 255;
 			depth_mid[3 * i + 1] = 255 - lb;
 			depth_mid[3 * i + 2] = 255 - lb;
-				break;
-			case 1:
+			break;
+		case 1:
 			depth_mid[3 * i + 0] = 255;
 			depth_mid[3 * i + 1] = lb;
 			depth_mid[3 * i + 2] = 0;
-				break;
-			case 2:
+			break;
+		case 2:
 			depth_mid[3 * i + 0] = 255 - lb;
 			depth_mid[3 * i + 1] = 255;
 			depth_mid[3 * i + 2] = 0;
-				break;
-			case 3:
+			break;
+		case 3:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 255;
 			depth_mid[3 * i + 2] = lb;
-				break;
-			case 4:
+			break;
+		case 4:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 255 - lb;
 			depth_mid[3 * i + 2] = 255;
-				break;
-			case 5:
+			break;
+		case 5:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 0;
 			depth_mid[3 * i + 2] = 255 - lb;
-				break;
-			default:
+			break;
+		default:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 0;
 			depth_mid[3 * i + 2] = 0;
-				break;
+			break;
 		}
 	}
 	got_depth++;
@@ -533,16 +547,29 @@ void *freenect_threadfunc(void *arg)
 
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
-
+	pthread_mutex_lock(&depth_mutex);
+	free(depth_mid);
+	free(depth_front);
+	pthread_mutex_unlock(&depth_mutex);
+	pthread_mutex_lock(&video_mutex);
+	free(rgb_back);
+	free(rgb_mid);
+	free(rgb_front);
+	pthread_mutex_unlock(&video_mutex);
 	printf("-- done!\n");
 	return NULL;
 }
 
 int main(int argc, char **argv)
 {
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	int res;
 
+
 	// allocate 8-bit uint*s to hold depth data
+	//depth_mid = new uint8_t[640 * 480 * 3];
+	//depth_front = new uint8_t[640 * 480 * 3];
+
 	depth_mid = (uint8_t*)malloc(640 * 480 * 3);
 	depth_front = (uint8_t*)malloc(640 * 480 * 3);
 
@@ -567,14 +594,14 @@ int main(int argc, char **argv)
 
 	g_argc = argc;
 	g_argv = argv;
-	
+
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("freenect_init() failed\n");
 		return 1;
 	}
 
 	// set up logging
-	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
+	freenect_set_log_level(f_ctx, FREENECT_LOG_INFO);
 
 	// select which kinect parts to open
 	freenect_select_subdevices(f_ctx, (freenect_device_flags)(FREENECT_DEVICE_MOTOR | FREENECT_DEVICE_CAMERA));
@@ -613,5 +640,18 @@ int main(int argc, char **argv)
 	// OS X requires GLUT to run on the main thread
 	gl_threadfunc(NULL);
 
+
+	pthread_mutex_lock(&depth_mutex);
+	free(depth_mid);
+	free(depth_front);
+	pthread_mutex_unlock(&depth_mutex);
+	pthread_mutex_lock(&video_mutex);
+	free(rgb_back);
+	free(rgb_mid);
+	free(rgb_front);
+	pthread_mutex_unlock(&video_mutex);
+
+
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
