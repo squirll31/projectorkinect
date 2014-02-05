@@ -358,6 +358,14 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 
 	// convert depth to color?
 
+	int pval[640*480];
+	for (i = 0; i < 640 * 480; i++)
+		pval[i] = 0;
+
+	int lb[640*480];
+	for (i = 0; i < 640 * 480; i++)
+		lb[i] = 0;
+
 	//  go through each pixel per frame.
 	//    there are 307,200 pixels.
 	for (i = 0; i<640 * 480; i++) {
@@ -370,50 +378,50 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 
 		//  then we use the resulting 11 bit unsigned integer to index into t_gamma, 
 		//    and get an unsigned 16 bit integer, and cast it to a regular integer.
-		int pval = t_gamma[depth[i]];
+		// int pval = t_gamma[depth[i]];
+		pval[i] = t_gamma[depth[i]];
 
 		//  we take our previous unsigned 16 bit integer, cast to integer,
 		//    and take only the bottom 8 bits.
 		//      call it lb.
-		int lb = pval & 0xff;
+		// int lb = pval & 0xff;
+		lb[i] = pval[i] & 0xff;
 
 		//  we take our previous unsigned 16 bit integer, cast to integer,
 		//    and shift its bits to the right 8?
 		//      which is the equivalent of dividing by 256?
 		//        and truncates, because switch only takes integers.
 		//          which leaves us only the high 8 bits of t_gamma[depth[i]]
-		switch (pval >> 8) {
+		switch (pval[i] >> 8) {
 			case 0:
-
-			//  
 			depth_mid[3 * i + 0] = 255;
-			depth_mid[3 * i + 1] = 255 - lb;
-			depth_mid[3 * i + 2] = 255 - lb;
+			depth_mid[3 * i + 1] = 255 - lb[i];
+			depth_mid[3 * i + 2] = 255 - lb[i];
 				break;
 			case 1:
 			depth_mid[3 * i + 0] = 255;
-			depth_mid[3 * i + 1] = lb;
+			depth_mid[3 * i + 1] = lb[i];
 			depth_mid[3 * i + 2] = 0;
 				break;
 			case 2:
-			depth_mid[3 * i + 0] = 255 - lb;
+			depth_mid[3 * i + 0] = 255 - lb[i];
 			depth_mid[3 * i + 1] = 255;
 			depth_mid[3 * i + 2] = 0;
 				break;
 			case 3:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 255;
-			depth_mid[3 * i + 2] = lb;
+			depth_mid[3 * i + 2] = lb[i];
 				break;
 			case 4:
 			depth_mid[3 * i + 0] = 0;
-			depth_mid[3 * i + 1] = 255 - lb;
+			depth_mid[3 * i + 1] = 255 - lb[i];
 			depth_mid[3 * i + 2] = 255;
 				break;
 			case 5:
 			depth_mid[3 * i + 0] = 0;
 			depth_mid[3 * i + 1] = 0;
-			depth_mid[3 * i + 2] = 255 - lb;
+			depth_mid[3 * i + 2] = 255 - lb[i];
 				break;
 			default:
 			depth_mid[3 * i + 0] = 0;
@@ -422,6 +430,41 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 				break;
 		}
 	}
+
+	FILE* depth_FILE = NULL;
+	FILE* pval_FILE = NULL;
+	FILE* lb_FILE = NULL;
+	FILE* depthMID_FILE = NULL;
+
+	char filename[128];
+
+	fopen_s(&depth_FILE, filename, "w+");
+	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depth.%032u.hex", timestamp);
+	fopen_s(&pval_FILE, filename, "w+");
+	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\pval.%032u.hex", timestamp);
+	fopen_s(&lb_FILE, filename, "w+");
+	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\lb.%032u.hex", timestamp);
+	fopen_s(&depthMID_FILE, filename, "w+");
+	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depthMID.%032u.hex", timestamp);
+	
+	if ((depth_FILE != NULL) & (pval_FILE != NULL) & (lb_FILE != NULL) & (depthMID_FILE != NULL)) {
+		for (i = 0; i < 640 * 480; i++) {
+			//  depth is uint16_t
+			fprintf(depth_FILE, "depth[%06i] = %#010X %#010X\n", i, depth[i] & 0xFF00, depth[i] & 0x00FF);
+			//  pval is 
+			fprintf(pval_FILE, "pval[%06i] = %#010X %#010X\n", i, pval[i] & 0xFF00, pval[i] & 0x00FF);
+			//  lb is an int
+			fprintf(lb_FILE, "lb[%06i] = %#010X %#010X\n", i, lb[i] & 0xFF00, lb[i] & 0x00FF);
+			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 0, depth_mid[3 * i + 0]);
+			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 1, depth_mid[3 * i + 1]);
+			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 2, depth_mid[3 * i + 2]);
+		}
+		fclose(depth_FILE);
+		fclose(pval_FILE);
+		fclose(lb_FILE);
+		fclose(depthMID_FILE);
+	}
+
 	got_depth++;
 	pthread_mutex_unlock(&depth_mutex);
 }
@@ -544,6 +587,8 @@ int main(int argc, char **argv)
 		float v = i / 2048.0;
 		v = powf(v, 3) * 6;
 		t_gamma[i] = v * 6 * 256;
+		//printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
+		//printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0x00FF, t_gamma[i] & 0xFF00);
 		//  t_gamma[0] = 0
 		//  t_gamma[   1] = 6 * (6 * (1 / 2^33)) * 256
 		//  t_gamma[   1] = 9 / 2^23 = ??? small number. much below 1.
@@ -551,10 +596,28 @@ int main(int argc, char **argv)
 		//  t_gamma[   3] = 6 * (6 * (9 / 2^33)) * 256
 		//  t_gamma[   4] = 6 * (6 * (1 / 2^9 )) * 256
 		//  t_gamma[2048] = 6 * (6 * (2048 / 2048)^3 * 256
-		//  t_gamma[2048] = 36 * 256
+		//  t_gamma[2048] = 36 * 2^8
 		//  t_gamma[2048] = 9 * 2^10
 		//  t_gamma[2048] = ...about 9K?
 	}
+
+	FILE* pFILE = NULL;
+
+	fopen_s(&pFILE, "t_gamma.integer", "w+");
+	if (pFILE != NULL) {
+		for (i = 0; i < 2048; i++)
+			// printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
+			fprintf(pFILE, "t_gamma[%04i] = %i\n", i, t_gamma[i]);
+		fclose(pFILE);
+	}
+
+	fopen_s(&pFILE, "t_gamma.hex", "w+");
+	if (pFILE != NULL) {
+		for (i = 0; i < 2048; i++)
+			// printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+			fprintf(pFILE, "t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+		fclose(pFILE);
+	}   
 
 	g_argc = argc;
 	g_argv = argv;
