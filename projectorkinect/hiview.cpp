@@ -23,19 +23,17 @@
  * Binary distributions must follow the binary distribution requirements of
  * either License.
  */
+#define _CRTDBG_MAP_ALLOC
 
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <crtdbg.h>
 #include <string.h>
 #include <assert.h>
-#include "libfreenect.h"
-
-#if defined(DEBUG)
-#include "freenect_debug.h"
-#endif
-
 #include <pthread.h>
+#include <libfreenect.h>
+#include "freenect_debug.h"
 
 #if defined(__APPLE__)
 #include <GLUT/glut.h>
@@ -48,6 +46,8 @@
 #endif
 
 #include <math.h>
+#include <list>
+#include <string>
 
 pthread_t freenect_thread;
 volatile int die = 0;
@@ -84,6 +84,8 @@ int got_rgb = 0;
 int got_depth = 0;
 int depth_on = 1;
 
+
+
 void DispatchDraws() {
 	pthread_mutex_lock(&depth_mutex);
 	if (got_depth) {
@@ -98,6 +100,27 @@ void DispatchDraws() {
 	}
 	pthread_mutex_unlock(&video_mutex);
 }
+void DrawString(std::string * theString){
+	int x = 50;
+	//glColor3f(1.0, 1.0, 1.0); // Green
+
+	glRasterPos3f(50, x, 0);
+
+	void * font = GLUT_BITMAP_HELVETICA_18;
+	unsigned int i = 0;
+	for (i = 0; i < theString->length(); i++)
+	{
+		if (theString->at(i) != '\n')
+			glutBitmapCharacter(font, theString->at(i));
+		else
+		{
+			x += 20;
+			glRasterPos3f(50, x, 0);
+			glutBitmapCharacter(font, theString->at(i));
+		}
+	}
+	delete theString;
+}
 
 void DrawDepthScene()
 {
@@ -109,6 +132,8 @@ void DrawDepthScene()
 		got_depth = 0;
 	}
 	pthread_mutex_unlock(&depth_mutex);
+
+	freenect_frame_mode frame_mode = freenect_get_current_depth_mode(f_dev);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
@@ -126,9 +151,10 @@ void DrawDepthScene()
 	glTexCoord2f(0, 1); glVertex3f(0, 480, 0);
 	glEnd();
 
-#if defined(DEBUG)
+#if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
+
 	glutSwapBuffers();
 }
 
@@ -171,9 +197,10 @@ void DrawVideoScene()
 	glTexCoord2f(0, 1); glVertex3f(0, frame_mode.height, 0);
 	glEnd();
 
-#if defined(DEBUG)
+#if defined(_DEBUG)
 	DrawString(debug_get_frame_mode_string(frame_mode));
 #endif
+
 	glutSwapBuffers();
 }
 
@@ -184,11 +211,7 @@ void keyPressed(unsigned char key, int x, int y)
 		pthread_join(freenect_thread, NULL);
 		glutDestroyWindow(depth_window);
 		glutDestroyWindow(video_window);
-		free(depth_mid);
-		free(depth_front);
-		free(rgb_back);
-		free(rgb_mid);
-		free(rgb_front);
+
 		// Not pthread_exit because OSX leaves a thread lying around and doesn't exit
 		exit(0);
 	}
@@ -215,8 +238,8 @@ void keyPressed(unsigned char key, int x, int y)
 			break;
 		}
 
-		if(current_resolution == FREENECT_RESOLUTION_HIGH) {
-			if(current_format == FREENECT_VIDEO_RGB) {
+		if (current_resolution == FREENECT_RESOLUTION_HIGH) {
+			if (current_format == FREENECT_VIDEO_RGB) {
 				requested_format = FREENECT_VIDEO_IR_8BIT;
 				// Since we can't stream the high-res IR while running the depth stream,
 				// we force the depth stream off when we reach this res in the cycle.
@@ -567,16 +590,29 @@ void *freenect_threadfunc(void *arg)
 
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
-
+	pthread_mutex_lock(&depth_mutex);
+	free(depth_mid);
+	free(depth_front);
+	pthread_mutex_unlock(&depth_mutex);
+	pthread_mutex_lock(&video_mutex);
+	free(rgb_back);
+	free(rgb_mid);
+	free(rgb_front);
+	pthread_mutex_unlock(&video_mutex);
 	printf("-- done!\n");
 	return NULL;
 }
 
 int main(int argc, char **argv)
 {
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	int res;
 
+
 	// allocate 8-bit uint*s to hold depth data
+	//depth_mid = new uint8_t[640 * 480 * 3];
+	//depth_front = new uint8_t[640 * 480 * 3];
+
 	depth_mid = (uint8_t*)malloc(640 * 480 * 3);
 	depth_front = (uint8_t*)malloc(640 * 480 * 3);
 
@@ -628,7 +664,7 @@ int main(int argc, char **argv)
 	}
 
 	// set up logging
-	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
+	freenect_set_log_level(f_ctx, FREENECT_LOG_INFO);
 
 	// select which kinect parts to open
 	freenect_select_subdevices(f_ctx, (freenect_device_flags)(FREENECT_DEVICE_MOTOR | FREENECT_DEVICE_CAMERA));
@@ -667,5 +703,18 @@ int main(int argc, char **argv)
 	// OS X requires GLUT to run on the main thread
 	gl_threadfunc(NULL);
 
+
+	pthread_mutex_lock(&depth_mutex);
+	free(depth_mid);
+	free(depth_front);
+	pthread_mutex_unlock(&depth_mutex);
+	pthread_mutex_lock(&video_mutex);
+	free(rgb_back);
+	free(rgb_mid);
+	free(rgb_front);
+	pthread_mutex_unlock(&video_mutex);
+
+
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
