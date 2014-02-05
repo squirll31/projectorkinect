@@ -29,11 +29,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <crtdbg.h>
-#include <string.h>
 #include <assert.h>
 #include <pthread.h>
-#include <libfreenect.h>
 #include "freenect_debug.h"
+#include <libfreenect.h>
+#include <string>
+
 
 #if defined(__APPLE__)
 #include <GLUT/glut.h>
@@ -48,6 +49,7 @@
 #include <math.h>
 #include <list>
 #include <string>
+#include "hiview.h"
 
 pthread_t freenect_thread;
 volatile int die = 0;
@@ -78,6 +80,8 @@ freenect_video_format requested_format = FREENECT_VIDEO_RGB;
 freenect_video_format current_format = FREENECT_VIDEO_RGB;
 freenect_resolution requested_resolution = FREENECT_RESOLUTION_HIGH;
 freenect_resolution current_resolution = FREENECT_RESOLUTION_HIGH;
+
+freenect_frame_mode default_mode;
 
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 int got_rgb = 0;
@@ -508,17 +512,19 @@ void video_cb(freenect_device *dev, void *rgb, uint32_t timestamp)
 
 void *freenect_threadfunc(void *arg)
 {
-	// set led color
-	freenect_set_led(f_dev, LED_RED);
+	freenect_frame_mode tmp_mode;
 
-	// register callback for depth frame
-	freenect_set_depth_callback(f_dev, depth_cb);
-	// register callback for video frame
-	freenect_set_video_callback(f_dev, video_cb);
+	// find our default mode
+	 default_mode = freenect_find_video_mode(current_resolution, current_format);
 
-	// set a resolution for the video camera
-	// default is "HIGH", "RGB"
-	freenect_set_video_mode(f_dev, freenect_find_video_mode(current_resolution, current_format));
+
+	freenect_set_led(f_dev, LED_RED);  	// set led color
+
+	freenect_set_depth_callback(f_dev, depth_cb); // register callback for depth frame
+	freenect_set_video_callback(f_dev, video_cb); // register callback for video frame
+
+	freenect_set_video_mode(f_dev, default_mode); // set a resolution for the video camera 
+												  // default is "HIGH", "RGB"
 
 	// set a resolution for the depth sensor
 	//FREENECT_RESOLUTION_LOW = 0, /**< QVGA - 320x240 */
@@ -527,9 +533,9 @@ void *freenect_threadfunc(void *arg)
 	freenect_set_depth_mode(f_dev, freenect_find_depth_mode(FREENECT_RESOLUTION_MEDIUM, FREENECT_DEPTH_11BIT));
 
 	// allocate video buffers
-	rgb_back = (uint8_t*)malloc(freenect_find_video_mode(current_resolution, current_format).bytes);
-	rgb_mid = (uint8_t*)malloc(freenect_find_video_mode(current_resolution, current_format).bytes);
-	rgb_front = (uint8_t*)malloc(freenect_find_video_mode(current_resolution, current_format).bytes);
+	rgb_back = new uint8_t[default_mode.bytes];
+	rgb_mid = new uint8_t[default_mode.bytes];
+	rgb_front = new uint8_t[default_mode.bytes];
 
 	// set buffer for video camera
 	freenect_set_video_buffer(f_dev, rgb_back);
@@ -549,8 +555,19 @@ void *freenect_threadfunc(void *arg)
 		if (requested_format != current_format || requested_resolution != current_resolution) {
 			// stop video
 			freenect_stop_video(f_dev);
+
 			// change kinect video mode
 			freenect_set_video_mode(f_dev, freenect_find_video_mode(requested_resolution, requested_format));
+			tmp_mode = freenect_get_current_video_mode(f_dev); 
+
+#if defined(_DEBUG)
+			if (requested_resolution != tmp_mode.resolution){
+				printf("warning: requested resolution was not set\n");
+			}
+			if (requested_format != tmp_mode.video_format){
+				printf("warning: requested video format was not set\n");
+			}
+#endif
 
 			// lock the video mutex so the video callback doesn't try to write
 			pthread_mutex_lock(&video_mutex);
@@ -561,12 +578,15 @@ void *freenect_threadfunc(void *arg)
 			free(rgb_front);
 
 			// malloc the video buffers
-			rgb_back = (uint8_t*)malloc(freenect_find_video_mode(requested_resolution, requested_format).bytes);
-			rgb_mid = (uint8_t*)malloc(freenect_find_video_mode(requested_resolution, requested_format).bytes);
-			rgb_front = (uint8_t*)malloc(freenect_find_video_mode(requested_resolution, requested_format).bytes);
 
-			current_format = requested_format;
-			current_resolution = requested_resolution;
+			rgb_back = new uint8_t[tmp_mode.bytes];
+			rgb_mid = new uint8_t[tmp_mode.bytes];
+			rgb_front = new uint8_t[tmp_mode.bytes];
+
+			current_format = tmp_mode.video_format;
+			current_resolution = tmp_mode.resolution;
+
+
 			pthread_mutex_unlock(&video_mutex);
 
 			// reassign the video buffer
@@ -590,6 +610,7 @@ void *freenect_threadfunc(void *arg)
 
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
+
 	pthread_mutex_lock(&depth_mutex);
 	free(depth_mid);
 	free(depth_front);
@@ -599,61 +620,23 @@ void *freenect_threadfunc(void *arg)
 	free(rgb_mid);
 	free(rgb_front);
 	pthread_mutex_unlock(&video_mutex);
+
+
+
 	printf("-- done!\n");
 	return NULL;
 }
 
+
 int main(int argc, char **argv)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-	int res;
+	_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG  );
+	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG  );
+	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG );
+	
 
-
-	// allocate 8-bit uint*s to hold depth data
-	//depth_mid = new uint8_t[640 * 480 * 3];
-	//depth_front = new uint8_t[640 * 480 * 3];
-
-	depth_mid = (uint8_t*)malloc(640 * 480 * 3);
-	depth_front = (uint8_t*)malloc(640 * 480 * 3);
-
-	printf("Kinect camera test\n");
-
-	int i;
-	for (i = 0; i<2048; i++) {
-		float v = i / 2048.0;
-		v = powf(v, 3) * 6;
-		t_gamma[i] = v * 6 * 256;
-		//printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
-		//printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0x00FF, t_gamma[i] & 0xFF00);
-		//  t_gamma[0] = 0
-		//  t_gamma[   1] = 6 * (6 * (1 / 2^33)) * 256
-		//  t_gamma[   1] = 9 / 2^23 = ??? small number. much below 1.
-		//  t_gamma[   2] = 6 * (6 * (1 / 2^30)) * 256
-		//  t_gamma[   3] = 6 * (6 * (9 / 2^33)) * 256
-		//  t_gamma[   4] = 6 * (6 * (1 / 2^9 )) * 256
-		//  t_gamma[2048] = 6 * (6 * (2048 / 2048)^3 * 256
-		//  t_gamma[2048] = 36 * 2^8
-		//  t_gamma[2048] = 9 * 2^10
-		//  t_gamma[2048] = ...about 9K?
-	}
-
-	FILE* pFILE = NULL;
-
-	fopen_s(&pFILE, "t_gamma.integer", "w+");
-	if (pFILE != NULL) {
-		for (i = 0; i < 2048; i++)
-			// printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
-			fprintf(pFILE, "t_gamma[%04i] = %i\n", i, t_gamma[i]);
-		fclose(pFILE);
-	}
-
-	fopen_s(&pFILE, "t_gamma.hex", "w+");
-	if (pFILE != NULL) {
-		for (i = 0; i < 2048; i++)
-			// printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
-			fprintf(pFILE, "t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
-		fclose(pFILE);
-	}   
+	int res; 
 
 	g_argc = argc;
 	g_argv = argv;
@@ -692,18 +675,70 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+
+	// allocate 8-bit uint*s to hold depth data
+	depth_mid = new uint8_t[640 * 480 * 3];
+	depth_front = new uint8_t[640 * 480 * 3];
+
+	printf("Kinect camera test\n");
+
+	int i;
+	for (i = 0; i<2048; i++) {
+		float v = i / 2048.0;
+		v = powf(v, 3) * 6;
+		t_gamma[i] = v * 6 * 256;
+		//printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
+		//printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0x00FF, t_gamma[i] & 0xFF00);
+		//  t_gamma[0] = 0
+		//  t_gamma[   1] = 6 * (6 * (1 / 2^33)) * 256
+		//  t_gamma[   1] = 9 / 2^23 = ??? small number. much below 1.
+		//  t_gamma[   2] = 6 * (6 * (1 / 2^30)) * 256
+		//  t_gamma[   3] = 6 * (6 * (9 / 2^33)) * 256
+		//  t_gamma[   4] = 6 * (6 * (1 / 2^9 )) * 256
+		//  t_gamma[2048] = 6 * (6 * (2048 / 2048)^3 * 256
+		//  t_gamma[2048] = 36 * 2^8
+		//  t_gamma[2048] = 9 * 2^10
+		//  t_gamma[2048] = ...about 9K?
+	}
+
+	FILE* pFILE = NULL;
+
+	fopen_s(&pFILE, "t_gamma.integer", "w+");
+	if (pFILE != NULL) {
+		for (i = 0; i < 2048; i++)
+			// printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
+			fprintf(pFILE, "t_gamma[%04i] = %i\n", i, t_gamma[i]);
+		fclose(pFILE);
+	}
+
+	fopen_s(&pFILE, "t_gamma.hex", "w+");
+	if (pFILE != NULL) {
+		for (i = 0; i < 2048; i++)
+			// printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+			fprintf(pFILE, "t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+		fclose(pFILE);
+	}
+
+
 	// start the freenect thread
 	res = pthread_create(&freenect_thread, NULL, freenect_threadfunc, NULL);
 	if (res) {
 		printf("pthread_create failed\n");
 		freenect_shutdown(f_ctx);
+		pthread_mutex_lock(&depth_mutex);
+		free(depth_mid);
+		free(depth_front);
+		pthread_mutex_unlock(&depth_mutex);
+		pthread_mutex_lock(&video_mutex);
+		free(rgb_back);
+		free(rgb_mid);
+		free(rgb_front);
+		pthread_mutex_unlock(&video_mutex);
+
 		return 1;
 	}
-
 	// OS X requires GLUT to run on the main thread
 	gl_threadfunc(NULL);
-
-
 	pthread_mutex_lock(&depth_mutex);
 	free(depth_mid);
 	free(depth_front);
@@ -715,6 +750,5 @@ int main(int argc, char **argv)
 	pthread_mutex_unlock(&video_mutex);
 
 
-	_CrtDumpMemoryLeaks();
 	return 0;
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include <libfreenect.h>
 #include <string>
 
 #define DEBUG_VIDEO_FORMATS_MAX 7
