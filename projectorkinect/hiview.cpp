@@ -25,7 +25,6 @@
  */
 #define _CRTDBG_MAP_ALLOC
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <crtdbg.h>
@@ -99,6 +98,7 @@ void DispatchDraws() {
 	}
 	pthread_mutex_unlock(&video_mutex);
 }
+
 void DrawString(std::string * theString){
 	int x = 50;
 	//glColor3f(1.0, 1.0, 1.0); // Green
@@ -610,26 +610,133 @@ int main(int argc, char **argv)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	int res;
 
-	//  if we are dumping depth frames...
-	//  make the directories needed to contain them.
-	//  first. let us get the present working directory.
-	//unsigned int pwd_len = GetCurrentDirectory(0, NULL);
-	//TCHAR* pwd = new wchar_t[pwd_len];
-	//GetCurrentDirectory(pwd_len, pwd);
+	int ret;
+	//  Set up strings for frame dump folder and subfolder creation.
+	wchar_t* dFrameDump_name = L"\\DepthFrameDumps\\";
+	size_t dFrameDump_len = wcslen(dFrameDump_name);
+	wchar_t* raw_name = L"Raw\\";
+	size_t raw_len = wcslen(raw_name);
+	wchar_t* lb_name = L"lb\\";
+	size_t lb_len = wcslen(lb_name);
+	wchar_t* pval_name = L"pval\\";
+	size_t pval_len = wcslen(pval_name);
+	wchar_t* dFrame_name = L"dFrame\\";
+	size_t dFrame_len = wcslen(dFrame_name);
 
-	// TCHAR* depthFrameDIR = new wchar_t[pwd_len + wcslen(L"\\DepthFrameDumps\\")];
-	// strcat(depthFrameDIR, );
+	//  Set up the frame dump directorys.
+	size_t pwd_len = GetCurrentDirectory(0, NULL);
+	wchar_t* pwd = new wchar_t[pwd_len];
+	GetCurrentDirectory(pwd_len, pwd);
+	//  don't forget to deallocate pwd.
 
-	////  second. let us check to see if our intermediate directories exists
-	//if (!CreateDirectory(L"\\DepthFrameDumps", NULL))
-	//{
-	//	//  the directory existed.
+	//  Create the folder all the other dump folders are in.
+	size_t dFrameDumpDIR_len = pwd_len + dFrameDump_len;
+	wchar_t* dFrameDumpDIR_name = new wchar_t[dFrameDumpDIR_len];
+	wcscpy_s(dFrameDumpDIR_name, dFrameDumpDIR_len, pwd);
+	wcsncat_s(dFrameDumpDIR_name, dFrameDumpDIR_len, dFrameDump_name, dFrameDump_len);
+	ret = CreateDirectory(dFrameDumpDIR_name, NULL);
+	//  don't forget to deallocate dFrameDumpDIR_name.
 
-	//}
-	//else { /* the directory was made. */ }
+	//  this is the dump folder for the raw depth frames.
+	size_t rawDIR_len = dFrameDumpDIR_len + raw_len;
+	wchar_t* rawDIR_name = new wchar_t[rawDIR_len];
+	wcscpy_s(rawDIR_name, rawDIR_len, dFrameDumpDIR_name);
+	wcsncat_s(rawDIR_name, rawDIR_len, raw_name, raw_len);
+	CreateDirectory(rawDIR_name, NULL);	
+	//  don't forget to deallocate rawDIR_name.
 
-	//  third. then let us make it if they didn't already exist.
-	//  fourth. 
+	//  this is the dump folder for the lb value per depth pixel.
+	size_t lbDIR_len = dFrameDumpDIR_len + lb_len;
+	wchar_t* lbDIR_name = new wchar_t[lbDIR_len];
+	wcscpy_s(lbDIR_name, lbDIR_len, dFrameDumpDIR_name);
+	wcsncat_s(lbDIR_name, lbDIR_len, lb_name, lb_len);
+	CreateDirectory(lbDIR_name, NULL);
+	//  don't forget to deallocate lbDIR_name.
+
+	//  this is the dump folder for the pval value per depth pixel.
+	size_t pvalDIR_len = dFrameDumpDIR_len + pval_len;
+	wchar_t* pvalDIR_name = new wchar_t[pvalDIR_len];
+	wcscpy_s(pvalDIR_name, pvalDIR_len, dFrameDumpDIR_name);
+	wcsncat_s(pvalDIR_name, pvalDIR_len, pval_name, pval_len);
+	CreateDirectory(pvalDIR_name, NULL);
+	//  don't forget to deallocate pvalDIR_name.
+
+	//  this is the dump folder for the color depth frame.
+	size_t dFrameDIR_len = dFrameDumpDIR_len + dFrame_len;
+	wchar_t* dFrameDIR_name = new wchar_t[dFrameDIR_len];
+	wcscpy_s(dFrameDIR_name, dFrameDIR_len, dFrameDumpDIR_name);
+	wcsncat_s(dFrameDIR_name, dFrameDIR_len, dFrame_name, dFrame_len);
+	CreateDirectory(dFrameDIR_name, NULL);
+	//  don't forget to deallocate dFrameDIR_name.
+
+	//  get a timestamp for making files unique.
+	SYSTEMTIME theTime;
+	GetSystemTime(&theTime);
+
+	size_t filename_len = wcslen(L"MM/DD/YYYY-HH:MM:SS");
+	//  let's clean this string up and make it more meaningful.
+	wchar_t* filename = L"%s%02d%02d%02d-%02d%02d%02d";
+
+	size_t rawFILE_len = rawDIR_len + filename_len;
+	wchar_t* rawFILE_name = new wchar_t[rawFILE_len];
+	wcscpy_s(rawFILE_name, rawFILE_len, rawDIR_name);
+	swprintf_s(rawFILE_name, rawFILE_len, filename,
+		rawDIR_name,
+		theTime.wMonth, theTime.wDay, theTime.wYear, 
+		theTime.wHour, theTime.wMinute, theTime.wSecond);
+	//  don't forget to deallocate rawFILE_name.
+
+	size_t lbFILE_len = lbDIR_len + filename_len;
+	wchar_t* lbFILE_name = new wchar_t[lbFILE_len];
+	swprintf_s(lbFILE_name, lbFILE_len, filename,
+		lbDIR_name,
+		theTime.wMonth, theTime.wDay, theTime.wYear,
+		theTime.wHour, theTime.wMinute, theTime.wSecond);
+	//  don't forget to deallocate lbFILE_name.
+
+	size_t pvalFILE_len = pvalDIR_len + filename_len;
+	wchar_t* pvalFILE_name = new wchar_t[pvalFILE_len];
+	swprintf_s(pvalFILE_name, pvalFILE_len, filename,
+		pvalDIR_name,
+		theTime.wMonth, theTime.wDay, theTime.wYear,
+		theTime.wHour, theTime.wMinute, theTime.wSecond);
+	//  don't forget to deallocate pvalFILE_name.
+
+	size_t dFrameFILE_len = dFrameDIR_len + filename_len;
+	wchar_t* dFrameFILE_name = new wchar_t[dFrameFILE_len];
+	swprintf_s(dFrameFILE_name, dFrameFILE_len, filename,
+		dFrameDIR_name,
+		theTime.wMonth, theTime.wDay, theTime.wYear,
+		theTime.wHour, theTime.wMinute, theTime.wSecond);
+	//  don't forget to deallocate dFrameFILE_name.
+
+	//  Open the files in the FrameDump subdirectories to store the data.
+	FILE* rawFILE = NULL;
+	_wfopen_s(&rawFILE, rawFILE_name, L"w+");
+
+	FILE* lbFILE = NULL;
+	_wfopen_s(&lbFILE, lbFILE_name, L"w+");
+
+	FILE* pvalFILE = NULL;
+	_wfopen_s(&pvalFILE, pvalFILE_name, L"w+");
+
+	FILE* dFrameFILE = NULL;
+	_wfopen_s(&dFrameFILE, dFrameFILE_name, L"w+");
+
+	wprintf(L"rawFILE_name = %s.\n", rawFILE_name);
+	wprintf(L"rawFILE = %#02X.\n", rawFILE);  // rawFILE = NULL?
+
+	fwprintf(rawFILE, L"test.\n.");
+	//fwprintf(lbFILE, L"test.\n.");
+	//fwprintf(pvalFILE, L"test.\n.");
+	//fwprintf(dFrameFILE, L"test.\n.");
+
+	//  or try this out!
+	//_fcloseall();
+	if (rawFILE != NULL)    fclose(rawFILE);
+	if (lbFILE != NULL)     fclose(lbFILE);
+	if (pvalFILE != NULL)   fclose(pvalFILE);
+	if (dFrameFILE != NULL) fclose(dFrameFILE);
 
 	// allocate 8-bit uint*s to hold depth data
 	//depth_mid = new uint8_t[640 * 480 * 3];
