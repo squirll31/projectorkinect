@@ -458,39 +458,39 @@ void depth_cb(freenect_device *dev, void *v_depth, uint32_t timestamp)
 		}
 	}
 
-	FILE* depth_FILE = NULL;
-	FILE* pval_FILE = NULL;
-	FILE* lb_FILE = NULL;
-	FILE* depthMID_FILE = NULL;
+	//FILE* depth_FILE = NULL;
+	//FILE* pval_FILE = NULL;
+	//FILE* lb_FILE = NULL;
+	//FILE* depthMID_FILE = NULL;
 
-	char filename[128];
+	//char filename[128];
 
-	fopen_s(&depth_FILE, filename, "w+");
-	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depth.%032u.hex", timestamp);
-	fopen_s(&pval_FILE, filename, "w+");
-	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\pval.%032u.hex", timestamp);
-	fopen_s(&lb_FILE, filename, "w+");
-	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\lb.%032u.hex", timestamp);
-	fopen_s(&depthMID_FILE, filename, "w+");
-	sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depthMID.%032u.hex", timestamp);
-	
-	if ((depth_FILE != NULL) & (pval_FILE != NULL) & (lb_FILE != NULL) & (depthMID_FILE != NULL)) {
-		for (i = 0; i < 640 * 480; i++) {
-			//  depth is uint16_t
-			fprintf(depth_FILE, "depth[%06i] = %#010X %#010X\n", i, depth[i] & 0xFF00, depth[i] & 0x00FF);
-			//  pval is 
-			fprintf(pval_FILE, "pval[%06i] = %#010X %#010X\n", i, pval[i] & 0xFF00, pval[i] & 0x00FF);
-			//  lb is an int
-			fprintf(lb_FILE, "lb[%06i] = %#010X %#010X\n", i, lb[i] & 0xFF00, lb[i] & 0x00FF);
-			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 0, depth_mid[3 * i + 0]);
-			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 1, depth_mid[3 * i + 1]);
-			fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 2, depth_mid[3 * i + 2]);
-		}
-		fclose(depth_FILE);
-		fclose(pval_FILE);
-		fclose(lb_FILE);
-		fclose(depthMID_FILE);
-	}
+	//fopen_s(&depth_FILE, filename, "w+");
+	//sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depth.%032u.hex", timestamp);
+	//fopen_s(&pval_FILE, filename, "w+");
+	//sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\pval.%032u.hex", timestamp);
+	//fopen_s(&lb_FILE, filename, "w+");
+	//sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\lb.%032u.hex", timestamp);
+	//fopen_s(&depthMID_FILE, filename, "w+");
+	//sprintf_s(filename, 128, "C:\\Users\\Zearro\\bin\\Depth_FrameDump\\depthMID.%032u.hex", timestamp);
+	//
+	//if ((depth_FILE != NULL) & (pval_FILE != NULL) & (lb_FILE != NULL) & (depthMID_FILE != NULL)) {
+	//	for (i = 0; i < 640 * 480; i++) {
+	//		//  depth is uint16_t
+	//		fprintf(depth_FILE, "depth[%06i] = %#010X %#010X\n", i, depth[i] & 0xFF00, depth[i] & 0x00FF);
+	//		//  pval is 
+	//		fprintf(pval_FILE, "pval[%06i] = %#010X %#010X\n", i, pval[i] & 0xFF00, pval[i] & 0x00FF);
+	//		//  lb is an int
+	//		fprintf(lb_FILE, "lb[%06i] = %#010X %#010X\n", i, lb[i] & 0xFF00, lb[i] & 0x00FF);
+	//		fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 0, depth_mid[3 * i + 0]);
+	//		fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 1, depth_mid[3 * i + 1]);
+	//		fprintf(depthMID_FILE, "depth_mid[%06i] = %#010X\n", 3 * i + 2, depth_mid[3 * i + 2]);
+	//	}
+	//	fclose(depth_FILE);
+	//	fclose(pval_FILE);
+	//	fclose(lb_FILE);
+	//	fclose(depthMID_FILE);
+	//}
 
 	got_depth++;
 	pthread_mutex_unlock(&depth_mutex);
@@ -539,6 +539,8 @@ void *freenect_threadfunc(void *arg)
 
 	// set buffer for video camera
 	freenect_set_video_buffer(f_dev, rgb_back);
+	freenect_set_depth_buffer(f_dev, depth_mid);
+
 
 	// start depth and video
 	freenect_start_depth(f_dev);
@@ -573,9 +575,9 @@ void *freenect_threadfunc(void *arg)
 			pthread_mutex_lock(&video_mutex);
 
 			// free the video buffers
-			free(rgb_back);
-			free(rgb_mid);
-			free(rgb_front);
+			delete[] rgb_back;
+			delete[] rgb_mid;
+			delete[] rgb_front;
 
 			// malloc the video buffers
 
@@ -612,13 +614,13 @@ void *freenect_threadfunc(void *arg)
 	freenect_shutdown(f_ctx);
 
 	pthread_mutex_lock(&depth_mutex);
-	free(depth_mid);
-	free(depth_front);
+	delete[] depth_mid;
+	delete[] depth_front;
 	pthread_mutex_unlock(&depth_mutex);
 	pthread_mutex_lock(&video_mutex);
-	free(rgb_back);
-	free(rgb_mid);
-	free(rgb_front);
+	delete[] rgb_back;
+	delete[] rgb_mid;
+	delete[] rgb_front;
 	pthread_mutex_unlock(&video_mutex);
 
 
@@ -701,23 +703,23 @@ int main(int argc, char **argv)
 		//  t_gamma[2048] = ...about 9K?
 	}
 
-	FILE* pFILE = NULL;
+	//FILE* pFILE = NULL;
 
-	fopen_s(&pFILE, "t_gamma.integer", "w+");
-	if (pFILE != NULL) {
-		for (i = 0; i < 2048; i++)
-			// printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
-			fprintf(pFILE, "t_gamma[%04i] = %i\n", i, t_gamma[i]);
-		fclose(pFILE);
-	}
+	//fopen_s(&pFILE, "t_gamma.integer", "w+");
+	//if (pFILE != NULL) {
+	//	for (i = 0; i < 2048; i++)
+	//		// printf("t_gamma[%04i] = %i\n", i, t_gamma[i]);
+	//		fprintf(pFILE, "t_gamma[%04i] = %i\n", i, t_gamma[i]);
+	//	fclose(pFILE);
+	//}
 
-	fopen_s(&pFILE, "t_gamma.hex", "w+");
-	if (pFILE != NULL) {
-		for (i = 0; i < 2048; i++)
-			// printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
-			fprintf(pFILE, "t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
-		fclose(pFILE);
-	}
+	//fopen_s(&pFILE, "t_gamma.hex", "w+");
+	//if (pFILE != NULL) {
+	//	for (i = 0; i < 2048; i++)
+	//		// printf("t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+	//		fprintf(pFILE, "t_gamma[%04i] = 0x%08X 0x%08X.\n", i, t_gamma[i] & 0xFF00, t_gamma[i] & 0x00FF);
+	//	fclose(pFILE);
+	//}
 
 
 	// start the freenect thread
@@ -726,13 +728,13 @@ int main(int argc, char **argv)
 		printf("pthread_create failed\n");
 		freenect_shutdown(f_ctx);
 		pthread_mutex_lock(&depth_mutex);
-		free(depth_mid);
-		free(depth_front);
+		delete[] depth_mid;
+		delete[] depth_front;
 		pthread_mutex_unlock(&depth_mutex);
 		pthread_mutex_lock(&video_mutex);
-		free(rgb_back);
-		free(rgb_mid);
-		free(rgb_front);
+		delete[] rgb_back;
+		delete[] rgb_mid;
+		delete[] rgb_front;
 		pthread_mutex_unlock(&video_mutex);
 
 		return 1;
@@ -740,13 +742,13 @@ int main(int argc, char **argv)
 	// OS X requires GLUT to run on the main thread
 	gl_threadfunc(NULL);
 	pthread_mutex_lock(&depth_mutex);
-	free(depth_mid);
-	free(depth_front);
+	delete[] depth_mid;
+	delete[] depth_front;
 	pthread_mutex_unlock(&depth_mutex);
 	pthread_mutex_lock(&video_mutex);
-	free(rgb_back);
-	free(rgb_mid);
-	free(rgb_front);
+	delete[] rgb_back;
+	delete[] rgb_mid;
+	delete[] rgb_front;
 	pthread_mutex_unlock(&video_mutex);
 
 
