@@ -26,5 +26,8 @@
     <ClInclude Include="freenect_debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="hiview.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-#include "libfreenect.h"
+#include <libfreenect.h>
 #include "freenect_debug.h"
 #include <stdio.h>
 #include <stdlib.h>
